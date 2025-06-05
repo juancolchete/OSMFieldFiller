@@ -93,6 +93,29 @@ export function GithubIssueForm({ osmData, locationName, onBack }: GithubIssueFo
   }
 
   const previewIssueBody = `## OSM Location Data
+
+**OpenStreetMap Link:** https://www.openstreetmap.org/?mlat=${
+    osmData
+      .split("\n")
+      .find((line) => line.startsWith("lat="))
+      ?.split("=")[1] || ""
+  }&mlon=${
+    osmData
+      .split("\n")
+      .find((line) => line.startsWith("lon="))
+      ?.split("=")[1] || ""
+  }#map=21/${
+    osmData
+      .split("\n")
+      .find((line) => line.startsWith("lat="))
+      ?.split("=")[1] || ""
+  }/${
+    osmData
+      .split("\n")
+      .find((line) => line.startsWith("lon="))
+      ?.split("=")[1] || ""
+  }
+
 ${description ? `\n${description}\n` : ""}
 \`\`\`
 ${osmData}
