@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Copy, Download, Github } from "lucide-react"
+import { Copy, Download, Github, Edit3, RotateCcw } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { MapPicker } from "@/components/map-picker"
 import { GithubIssueForm } from "@/components/github-issue-form"
@@ -302,6 +302,10 @@ export function OsmForm() {
     "survey:date": getCurrentDate(),
   })
 
+  // State for manual editing
+  const [isManualEdit, setIsManualEdit] = useState(false)
+  const [manualTags, setManualTags] = useState("")
+
   // State for copy button
   const [copied, setCopied] = useState(false)
 
@@ -357,16 +361,61 @@ export function OsmForm() {
     return output.join("\n")
   }
 
+  // Get the final tags (either generated or manual)
+  const getFinalTags = () => {
+    return isManualEdit ? manualTags : generateKeyValueFormat()
+  }
+
+  // Toggle manual edit mode
+  const toggleManualEdit = () => {
+    if (!isManualEdit) {
+      // Switching to manual edit - populate with current generated tags
+      setManualTags(generateKeyValueFormat())
+    } else {
+      // Switching back to form mode - parse manual tags back to form fields
+      parseManualTagsToForm()
+    }
+    setIsManualEdit(!isManualEdit)
+  }
+
+  // Parse manual tags back to form fields
+  const parseManualTagsToForm = () => {
+    const lines = manualTags.split("\n").filter((line) => line.trim() !== "")
+    const newTagValues: Record<string, string> = {}
+
+    lines.forEach((line) => {
+      const [key, ...valueParts] = line.split("=")
+      if (key && valueParts.length > 0) {
+        const value = valueParts.join("=") // In case the value contains '='
+
+        if (key === "lat") {
+          setLatitude(value)
+        } else if (key === "lon") {
+          setLongitude(value)
+        } else {
+          newTagValues[key] = value
+        }
+      }
+    })
+
+    setTagValues(newTagValues)
+  }
+
+  // Reset to form-generated tags
+  const resetToFormTags = () => {
+    setManualTags(generateKeyValueFormat())
+  }
+
   // Copy to clipboard
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(generateKeyValueFormat())
+    navigator.clipboard.writeText(getFinalTags())
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
   // Download as text file
   const downloadText = () => {
-    const blob = new Blob([generateKeyValueFormat()], { type: "text/plain" })
+    const blob = new Blob([getFinalTags()], { type: "text/plain" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
@@ -538,41 +587,75 @@ export function OsmForm() {
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Tag Information</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Tabs defaultValue="basic">
-                    <TabsList className="grid grid-cols-5 mb-4">
-                      <TabsTrigger value="basic">Basic</TabsTrigger>
-                      <TabsTrigger value="address">Address</TabsTrigger>
-                      <TabsTrigger value="payment">Payment</TabsTrigger>
-                      <TabsTrigger value="currency">Currency</TabsTrigger>
-                      <TabsTrigger value="custom">Custom</TabsTrigger>
-                    </TabsList>
+              {!isManualEdit && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Tag Information</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Tabs defaultValue="basic">
+                      <TabsList className="grid grid-cols-5 mb-4">
+                        <TabsTrigger value="basic">Basic</TabsTrigger>
+                        <TabsTrigger value="address">Address</TabsTrigger>
+                        <TabsTrigger value="payment">Payment</TabsTrigger>
+                        <TabsTrigger value="currency">Currency</TabsTrigger>
+                        <TabsTrigger value="custom">Custom</TabsTrigger>
+                      </TabsList>
 
-                    {Object.entries(tagGroups).map(([group, tags]) => (
-                      <TabsContent key={group} value={group} className="space-y-4">
-                        {tags.map(renderField)}
-                      </TabsContent>
-                    ))}
-                  </Tabs>
-                </CardContent>
-              </Card>
+                      {Object.entries(tagGroups).map(([group, tags]) => (
+                        <TabsContent key={group} value={group} className="space-y-4">
+                          {tags.map(renderField)}
+                        </TabsContent>
+                      ))}
+                    </Tabs>
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             <div>
               <Card>
                 <CardHeader>
-                  <CardTitle>Generated OSM Tags</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Generated OSM Tags</CardTitle>
+                    <Button variant="outline" size="sm" onClick={toggleManualEdit} className="flex items-center gap-2">
+                      <Edit3 className="h-4 w-4" />
+                      {isManualEdit ? "Form Mode" : "Manual Edit"}
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <ScrollArea className="h-[600px] w-full rounded-md border p-4 mb-4">
-                    <pre className="text-sm font-mono whitespace-pre-wrap">{generateKeyValueFormat()}</pre>
-                  </ScrollArea>
+                  {isManualEdit ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="manual-tags">Edit Tags Manually</Label>
+                        <Button variant="ghost" size="sm" onClick={resetToFormTags} className="flex items-center gap-2">
+                          <RotateCcw className="h-4 w-4" />
+                          Reset to Form
+                        </Button>
+                      </div>
+                      <Textarea
+                        id="manual-tags"
+                        value={manualTags}
+                        onChange={(e) => setManualTags(e.target.value)}
+                        className="min-h-[500px] font-mono text-sm"
+                        placeholder="lat=-19.8430171
+lon=-43.9191272
+name=Example Location
+shop=convenience
+..."
+                      />
+                      <div className="text-xs text-muted-foreground">
+                        Format: key=value (one per line). Changes will be reflected when you switch back to Form Mode.
+                      </div>
+                    </div>
+                  ) : (
+                    <ScrollArea className="h-[600px] w-full rounded-md border p-4 mb-4">
+                      <pre className="text-sm font-mono whitespace-pre-wrap">{generateKeyValueFormat()}</pre>
+                    </ScrollArea>
+                  )}
 
-                  <div className="flex gap-4">
+                  <div className="flex gap-4 mt-4">
                     <Button variant="outline" className="flex-1" onClick={copyToClipboard}>
                       <Copy className="mr-2 h-4 w-4" />
                       {copied ? "Copied!" : "Copy Tags"}
@@ -594,7 +677,7 @@ export function OsmForm() {
 
         <TabsContent value="github" className="mt-6">
           <GithubIssueForm
-            osmData={generateKeyValueFormat()}
+            osmData={getFinalTags()}
             locationName={tagValues["name"] || "New Location"}
             onBack={() => setActiveTab("form")}
           />
