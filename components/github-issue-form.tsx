@@ -94,7 +94,7 @@ export function GithubIssueForm({ osmData, locationName, onBack }: GithubIssueFo
 
   const previewIssueBody = `## OSM Location Data
 
-**OpenStreetMap Link:** https://www.openstreetmap.org/?mlat=${
+**OpenStreetMap Link:** [View on OpenStreetMap](https://www.openstreetmap.org/?mlat=${
     osmData
       .split("\n")
       .find((line) => line.startsWith("lat="))
@@ -114,7 +114,7 @@ export function GithubIssueForm({ osmData, locationName, onBack }: GithubIssueFo
       .split("\n")
       .find((line) => line.startsWith("lon="))
       ?.split("=")[1] || ""
-  }
+  })
 
 ${description ? `\n${description}\n` : ""}
 \`\`\`
