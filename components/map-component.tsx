@@ -192,6 +192,17 @@ export function MapComponent({ initialLat, initialLon, onLocationSelect }: MapCo
     }
   }, [isFullscreen])
 
+  useEffect(() => {
+    // Update map center when initialLat or initialLon props change
+    const newLat = Number.parseFloat(initialLat.toString())
+    const newLon = Number.parseFloat(initialLon.toString())
+
+    if (!isNaN(newLat) && !isNaN(newLon)) {
+      const newCenter: [number, number] = [newLat, newLon]
+      setMapCenter(newCenter)
+    }
+  }, [initialLat, initialLon])
+
   // Handle marker position updates
   const handleLocationUpdate = useCallback(
     (lat: number, lng: number) => {
