@@ -14,9 +14,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Title and OSM data are required" }, { status: 400 })
     }
 
+    // Extract coordinates from osmData for the OpenStreetMap link
+    const lines = osmData.split("\n")
+    const latLine = lines.find((line: string) => line.startsWith("lat="))
+    const lonLine = lines.find((line: string) => line.startsWith("lon="))
+
+    const lat = latLine ? latLine.split("=")[1] : ""
+    const lon = lonLine ? lonLine.split("=")[1] : ""
+
+    // Create OpenStreetMap link if coordinates are available
+    const osmLink =
+      lat && lon
+        ? `**OpenStreetMap Link:** [View on OpenStreetMap](https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=21/${lat}/${lon})\n\n`
+        : ""
+
     // Prepare the issue body
     const issueBody = `## OSM Location Data
-${description ? `\n${description}\n` : ""}
+
+${osmLink}${description ? `${description}\n\n` : ""}
 \`\`\`
 ${osmData}
 \`\`\`
