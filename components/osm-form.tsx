@@ -277,6 +277,9 @@ export function OsmForm() {
       { key: "payment:credit_cards", label: "Credit Cards", isCheckbox: true },
       { key: "payment:apple_pay", label: "Apple Pay", isCheckbox: true },
       { key: "payment:google_pay", label: "Google Pay", isCheckbox: true },
+      { key: "payment:lightning_contactless", label: "Lightning Contactless", isCheckbox: true },
+      { key: "payment:lightning", label: "Lightning", isCheckbox: true },
+      { key: "payment:onchain", label: "Bitcoin On-chain", isCheckbox: true },
     ],
     currency: [
       { key: "currency:BRL", label: "Brazilian Real (BRL)", isCheckbox: true },
