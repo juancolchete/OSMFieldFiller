@@ -264,6 +264,7 @@ export function OsmForm() {
       { key: "opening_hours", label: "Opening Hours", placeholder: "e.g., Mo-Su 08:00-19:00" },
       { key: "check_date", label: "Check Date", placeholder: "e.g., 2025-04-17" },
       { key: "survey:date", label: "Survey Date", placeholder: "e.g., 2025-04-17" },
+      { key: "access", label: "Public Access", isCheckbox: true },
     ],
     address: [
       { key: "addr:street", label: "Street", placeholder: "e.g., Avenida Saramenha" },
