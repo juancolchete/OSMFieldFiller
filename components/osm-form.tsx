@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -305,12 +305,21 @@ export function OsmForm() {
   // State for manual editing
   const [isManualEdit, setIsManualEdit] = useState(false)
   const [manualTags, setManualTags] = useState("")
+  const [manualEditApplied, setManualEditApplied] = useState(false)
 
   // State for copy button
   const [copied, setCopied] = useState(false)
 
   // State for active tab
   const [activeTab, setActiveTab] = useState("form")
+
+  // Effect to parse manual tags when switching back to form mode
+  useEffect(() => {
+    if (manualEditApplied && !isManualEdit) {
+      parseManualTagsToForm()
+      setManualEditApplied(false)
+    }
+  }, [isManualEdit, manualEditApplied])
 
   // Update a tag value
   const updateTagValue = (key: string, value: string) => {
@@ -372,8 +381,8 @@ export function OsmForm() {
       // Switching to manual edit - populate with current generated tags
       setManualTags(generateKeyValueFormat())
     } else {
-      // Switching back to form mode - parse manual tags back to form fields
-      parseManualTagsToForm()
+      // Switching back to form mode - mark that we need to parse manual tags
+      setManualEditApplied(true)
     }
     setIsManualEdit(!isManualEdit)
   }
