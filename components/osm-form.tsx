@@ -265,6 +265,12 @@ export function OsmForm() {
       { key: "check_date", label: "Check Date", placeholder: "e.g., 2025-04-17" },
       { key: "survey:date", label: "Survey Date", placeholder: "e.g., 2025-04-17" },
       { key: "access", label: "Public Access", isCheckbox: true },
+      { key: "website", label: "Website", placeholder: "e.g., https://example.com" },
+      {
+        key: "contact:instagram",
+        label: "Instagram",
+        placeholder: "e.g., https://instagram.com/username",
+      },
     ],
     address: [
       { key: "addr:street", label: "Street", placeholder: "e.g., Avenida Saramenha" },
@@ -495,6 +501,9 @@ export function OsmForm() {
           <Label htmlFor={tag.key}>{tag.label}</Label>
           <ShopTypeSelector
             id={tag.key}
+            value={getShopAmenityValue()}
+            onChange={handleShopAmenitySelect}
+            placeholder={tag.placeholder || "Select type..."}
             value={getShopAmenityValue()}
             onChange={handleShopAmenitySelect}
             placeholder={tag.placeholder || "Select type..."}
