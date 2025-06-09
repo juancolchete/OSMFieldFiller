@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -28,12 +28,27 @@ interface ResultState {
 }
 
 export function GithubIssueForm({ osmData, locationName, onBack }: GithubIssueFormProps) {
-  const [title, setTitle] = useState(`New OSM location: ${locationName}`)
+  // Extract name from OSM data
+  const extractNameFromOsmData = () => {
+    const lines = osmData.split("\n")
+    const nameLine = lines.find((line) => line.startsWith("name="))
+    if (nameLine) {
+      return nameLine.substring(5) // Remove "name=" prefix
+    }
+    return locationName || "New Location"
+  }
+
+  const [title, setTitle] = useState(`New OSM location: ${extractNameFromOsmData()}`)
   const [description, setDescription] = useState("")
   const [submitterName, setSubmitterName] = useState("")
   const [submitterEmail, setSubmitterEmail] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [result, setResult] = useState<ResultState | null>(null)
+
+  // Update title when osmData changes
+  useEffect(() => {
+    setTitle(`New OSM location: ${extractNameFromOsmData()}`)
+  }, [osmData])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
