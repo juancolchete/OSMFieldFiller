@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { MapPicker } from "@/components/map-picker"
 import { GithubIssueForm } from "@/components/github-issue-form"
 import { ShopTypeSelector } from "@/components/shop-type-selector"
+import { CbtcSelector } from "@/components/cbtc-selector"
 // Import the ImageUploader component at the top of the file
 import { ImageUploader } from "@/components/image-uploader"
 
@@ -293,7 +294,7 @@ export function OsmForm() {
       { key: "currency:XBT", label: "Bitcoin (XBT)", isCheckbox: true },
     ],
     custom: [
-      { key: "CBTC", label: "CBTC", placeholder: "e.g., BitcoinBH" },
+      { key: "CBTC", label: "Community (CBTC)", placeholder: "Select a community...", isCbtcSelector: true },
       { key: "OBTC", label: "OBTC", placeholder: "e.g., UAIBIT" },
       { key: "PBTC", label: "Image URL (PBTC)", placeholder: "https://..." },
     ],
@@ -303,10 +304,11 @@ export function OsmForm() {
   const [latitude, setLatitude] = useState("-19.8430171")
   const [longitude, setLongitude] = useState("-43.9191272")
 
-  // State for tag values
+  // State for tag values - Set OBTC default to "UAIBIT"
   const [tagValues, setTagValues] = useState<Record<string, string>>({
     check_date: getCurrentDate(),
     "survey:date": getCurrentDate(),
+    OBTC: "UAIBIT", // Default value for OBTC
   })
 
   // State for manual editing
@@ -483,6 +485,7 @@ export function OsmForm() {
     multiline?: boolean
     isShopType?: boolean
     isCheckbox?: boolean
+    isCbtcSelector?: boolean
   }) => {
     // Special case for PBTC (image upload)
     if (tag.key === "PBTC") {
@@ -494,6 +497,24 @@ export function OsmForm() {
       )
     }
 
+    // Special case for CBTC community selector
+    if (tag.isCbtcSelector) {
+      return (
+        <div className="space-y-2" key={tag.key}>
+          <Label htmlFor={tag.key}>{tag.label}</Label>
+          <CbtcSelector
+            id={tag.key}
+            value={tagValues[tag.key] || ""}
+            onChange={(value) => updateTagValue(tag.key, value)}
+            placeholder={tag.placeholder || "Select a community..."}
+          />
+          <div className="text-xs text-muted-foreground">
+            Will be saved as: CBTC={tagValues[tag.key] || "(not selected)"}
+          </div>
+        </div>
+      )
+    }
+
     // Special case for shop/amenity type dropdown with search
     if (tag.isShopType) {
       return (
@@ -501,9 +522,6 @@ export function OsmForm() {
           <Label htmlFor={tag.key}>{tag.label}</Label>
           <ShopTypeSelector
             id={tag.key}
-            value={getShopAmenityValue()}
-            onChange={handleShopAmenitySelect}
-            placeholder={tag.placeholder || "Select type..."}
             value={getShopAmenityValue()}
             onChange={handleShopAmenitySelect}
             placeholder={tag.placeholder || "Select type..."}
@@ -637,7 +655,12 @@ export function OsmForm() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle>Generated OSM Tags</CardTitle>
-                    <Button variant="outline" size="sm" onClick={toggleManualEdit} className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={toggleManualEdit}
+                      className="flex items-center gap-2 bg-transparent"
+                    >
                       <Edit3 className="h-4 w-4" />
                       {isManualEdit ? "Form Mode" : "Manual Edit"}
                     </Button>
@@ -675,7 +698,7 @@ shop=convenience
                   )}
 
                   <div className="flex gap-4 mt-4">
-                    <Button variant="outline" className="flex-1" onClick={copyToClipboard}>
+                    <Button variant="outline" className="flex-1 bg-transparent" onClick={copyToClipboard}>
                       <Copy className="mr-2 h-4 w-4" />
                       {copied ? "Copied!" : "Copy Tags"}
                     </Button>
