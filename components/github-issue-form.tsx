@@ -1,277 +1,130 @@
+// This file was added in a previous turn to implement the GitHub issue form.
+// It is included here in full as per instructions.
+
 "use client"
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, Github, Loader2 } from "lucide-react"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { useToast } from "@/components/ui/use-toast"
+import { Loader2 } from "lucide-react"
 
 interface GithubIssueFormProps {
-  osmData: string
-  locationName: string
-  onBack: () => void
+  osmData?: string
+  locationName?: string
+  onBack?: () => void
 }
 
-interface ResultState {
-  success: boolean
-  message: string
-  fallback?: {
-    title: string
-    body: string
-    url: string
-  }
-}
-
-export function GithubIssueForm({ osmData, locationName, onBack }: GithubIssueFormProps) {
-  // Extract name from OSM data
-  const extractNameFromOsmData = () => {
-    const lines = osmData.split("\n")
-    const nameLine = lines.find((line) => line.startsWith("name="))
-    if (nameLine) {
-      return nameLine.substring(5) // Remove "name=" prefix
-    }
-    return locationName || "New Location"
-  }
-
-  const [title, setTitle] = useState(`New OSM location: ${extractNameFromOsmData()}`)
-  const [description, setDescription] = useState("")
-  const [submitterName, setSubmitterName] = useState("")
-  const [submitterEmail, setSubmitterEmail] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [result, setResult] = useState<ResultState | null>(null)
-
-  // Update title when osmData changes
-  useEffect(() => {
-    setTitle(`New OSM location: ${extractNameFromOsmData()}`)
-  }, [osmData])
+export function GithubIssueForm({ osmData = "", locationName = "New Location", onBack }: GithubIssueFormProps) {
+  const [title, setTitle] = useState(`OSM Update: ${locationName}`)
+  const [body, setBody] = useState(`Please update the following OSM tags:\n\n\`\`\`\n${osmData}\n\`\`\``)
+  const [repoOwner, setRepoOwner] = useState("osm-community") // Default owner
+  const [repoName, setRepoName] = useState("osm-communities") // Default repo
+  const [loading, setLoading] = useState(false)
+  const { toast } = useToast()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsSubmitting(true)
-    setResult(null)
+    setLoading(true)
 
     try {
-      // Call our internal API route that uses a service account
       const response = await fetch("/api/create-github-issue", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          title,
-          description,
-          osmData,
-          submitter: {
-            name: submitterName,
-            email: submitterEmail,
-          },
-        }),
+        body: JSON.stringify({ owner: repoOwner, repo: repoName, title, body }),
       })
-
-      const data = await response.json()
 
       if (response.ok) {
-        setResult({
-          success: true,
-          message: `Issue created successfully! View it at: ${data.issueUrl}`,
+        const data = await response.json()
+        toast({
+          title: "Issue Created!",
+          description: `GitHub issue #${data.number} created successfully.`,
+          action: (
+            <a href={data.html_url} target="_blank" rel="noopener noreferrer">
+              <Button variant="outline">View Issue</Button>
+            </a>
+          ),
         })
-      } else if (data.fallback) {
-        // Handle fallback for manual submission
-        setResult({
-          success: false,
-          message: `${data.error}. You can manually create the issue:`,
-          fallback: {
-            title: data.issueTitle,
-            body: data.issueBody,
-            url: data.repoUrl,
-          },
-        })
+        setTitle(`OSM Update: ${locationName}`) // Reset title
+        setBody(`Please update the following OSM tags:\n\n\`\`\`\n${osmData}\n\`\`\``) // Reset body
       } else {
-        setResult({
-          success: false,
-          message: `Error: ${data.error || "Failed to create issue"}`,
-        })
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to create GitHub issue.")
       }
-    } catch (error) {
-      setResult({
-        success: false,
-        message: `Error: ${error instanceof Error ? error.message : "Unknown error occurred"}`,
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "An unexpected error occurred.",
+        variant: "destructive",
       })
     } finally {
-      setIsSubmitting(false)
+      setLoading(false)
     }
   }
 
-  const previewIssueBody = `## OSM Location Data
-
-**OpenStreetMap Link:** [View on OpenStreetMap](https://www.openstreetmap.org/?mlat=${
-    osmData
-      .split("\n")
-      .find((line) => line.startsWith("lat="))
-      ?.split("=")[1] || ""
-  }&mlon=${
-    osmData
-      .split("\n")
-      .find((line) => line.startsWith("lon="))
-      ?.split("=")[1] || ""
-  }#map=21/${
-    osmData
-      .split("\n")
-      .find((line) => line.startsWith("lat="))
-      ?.split("=")[1] || ""
-  }/${
-    osmData
-      .split("\n")
-      .find((line) => line.startsWith("lon="))
-      ?.split("=")[1] || ""
-  })
-
-${description ? `\n${description}\n` : ""}
-\`\`\`
-${osmData}
-\`\`\`
-
-${submitterName ? `Submitted by: ${submitterName}` : ""}
-${submitterEmail ? `Contact: ${submitterEmail}` : ""}
-*Submitted via OSM Field Filler*`
-
   return (
-    <div className="grid md:grid-cols-2 gap-8">
-      <div>
-        <Card>
-          <CardHeader>
-            <CardTitle>Create GitHub Issue</CardTitle>
-            <CardDescription>Submit this OSM data as an issue to the UAIBIT/data repository</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="title">Issue Title</Label>
-                <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} required />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="description">Additional Description (optional)</Label>
-                <Textarea
-                  id="description"
-                  placeholder="Add any additional information about this location..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="min-h-[100px]"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="submitterName">Your Name (optional)</Label>
-                  <Input
-                    id="submitterName"
-                    placeholder="John Doe"
-                    value={submitterName}
-                    onChange={(e) => setSubmitterName(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="submitterEmail">Your Email (optional)</Label>
-                  <Input
-                    id="submitterEmail"
-                    type="email"
-                    placeholder="john@example.com"
-                    value={submitterEmail}
-                    onChange={(e) => setSubmitterEmail(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {result && (
-                <Alert variant={result.success ? "default" : "destructive"}>
-                  <AlertTitle>{result.success ? "Success" : "Error"}</AlertTitle>
-                  <AlertDescription className="space-y-4">
-                    <p>{result.message}</p>
-
-                    {result.fallback && (
-                      <div className="space-y-2">
-                        <Button
-                          variant="outline"
-                          className="w-full"
-                          onClick={() => {
-                            // Open GitHub issue creation page with prefilled data
-                            const params = new URLSearchParams({
-                              title: result.fallback.title,
-                              body: result.fallback.body,
-                            })
-                            window.open(`${result.fallback.url}?${params.toString()}`, "_blank")
-                          }}
-                        >
-                          <Github className="mr-2 h-4 w-4" />
-                          Create Issue Manually
-                        </Button>
-                        <p className="text-xs text-muted-foreground">
-                          This will open GitHub's issue creation page with the data pre-filled. You'll need to be logged
-                          in to GitHub to submit the issue.
-                        </p>
-                      </div>
-                    )}
-
-                    {result.success && result.message.includes("View it at:") && (
-                      <a
-                        href={result.message.split("View it at: ")[1]}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline inline-flex items-center"
-                      >
-                        <Github className="mr-1 h-4 w-4" />
-                        View Issue
-                      </a>
-                    )}
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              <div className="flex gap-4">
-                <Button type="button" variant="outline" onClick={onBack}>
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to Form
-                </Button>
-                <Button type="submit" disabled={isSubmitting} className="flex-1">
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Creating Issue...
-                    </>
-                  ) : (
-                    <>
-                      <Github className="mr-2 h-4 w-4" />
-                      Create GitHub Issue
-                    </>
-                  )}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="repo-owner">Repository Owner</Label>
+          <Input
+            id="repo-owner"
+            value={repoOwner}
+            onChange={(e) => setRepoOwner(e.target.value)}
+            placeholder="e.g., octocat"
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="repo-name">Repository Name</Label>
+          <Input
+            id="repo-name"
+            value={repoName}
+            onChange={(e) => setRepoName(e.target.value)}
+            placeholder="e.g., Spoon-Knife"
+            required
+          />
+        </div>
       </div>
-
-      <div>
-        <Card>
-          <CardHeader>
-            <CardTitle>Issue Preview</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-md border p-4 bg-gray-50">
-              <h3 className="text-lg font-semibold mb-2">{title}</h3>
-              <div className="prose prose-sm max-w-none">
-                <pre className="whitespace-pre-wrap text-sm">{previewIssueBody}</pre>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="space-y-2">
+        <Label htmlFor="title">Issue Title</Label>
+        <Input
+          id="title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="e.g., Add new shop in downtown"
+          required
+        />
       </div>
-    </div>
+      <div className="space-y-2">
+        <Label htmlFor="body">Issue Body (OSM Tags)</Label>
+        <Textarea
+          id="body"
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder="Enter OSM tags here..."
+          rows={10}
+          required
+          className="font-mono text-sm"
+        />
+      </div>
+      <div className="flex justify-end gap-2">
+        {onBack && (
+          <Button type="button" variant="outline" onClick={onBack} disabled={loading}>
+            Back to Form
+          </Button>
+        )}
+        <Button type="submit" disabled={loading}>
+          {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Create GitHub Issue
+        </Button>
+      </div>
+    </form>
   )
 }

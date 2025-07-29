@@ -3,12 +3,15 @@
 import { useEffect, useState, useCallback } from "react"
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
-import L from "leaflet"
+import "leaflet-defaulticon-compatibility/dist/leaflet-defaulticon-compatibility.css"
+import "leaflet-defaulticon-compatibility"
+import L from "leaflet" // Direct import of Leaflet
 import { MapSearch } from "@/components/map-search"
 import { Maximize2, Minimize2, Map, Satellite, Layers } from "lucide-react"
 import { createPortal } from "react-dom"
 
 // Fix Leaflet marker icon issue in Next.js
+// Define the icon directly here, as this component is now guaranteed to be client-side
 const icon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
   shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
@@ -19,34 +22,33 @@ const icon = L.icon({
 interface MapComponentProps {
   initialLat: number
   initialLon: number
-  onLocationSelect: (lat: string, lon: string) => void
+  onLocationSelect?: (lat: string, lon: string) => void
 }
 
 // Component to handle map click events
 function LocationMarker({
   onLocationSelect,
-  currentPosition,
 }: {
-  onLocationSelect: (lat: number, lng: number) => void
-  currentPosition: [number, number]
+  onLocationSelect?: (lat: string, lon: string) => void
 }) {
   const [position, setPosition] = useState<L.LatLng | null>(null)
-
   const map = useMapEvents({
     click(e) {
       setPosition(e.latlng)
-      onLocationSelect(e.latlng.lat, e.latlng.lng)
+      onLocationSelect?.(e.latlng.lat.toFixed(7), e.latlng.lng.toFixed(7))
+    },
+    locationfound(e) {
+      setPosition(e.latlng)
+      map.flyTo(e.latlng, map.getZoom())
+      onLocationSelect?.(e.latlng.lat.toFixed(7), e.latlng.lng.toFixed(7))
     },
   })
 
-  // Update position when currentPosition changes
   useEffect(() => {
-    if (currentPosition) {
-      setPosition(new L.LatLng(currentPosition[0], currentPosition[1]))
-    }
-  }, [currentPosition])
+    map.locate()
+  }, [map])
 
-  return position === null ? null : <Marker position={position} icon={icon} />
+  return position === null ? null : <Marker position={position}></Marker>
 }
 
 // Component to update map view when search result is selected
@@ -132,7 +134,7 @@ function MapContent({
         </>
       )}
       <Marker position={mapCenter} icon={icon} />
-      <LocationMarker onLocationSelect={onLocationUpdate} currentPosition={mapCenter} />
+      <LocationMarker onLocationSelect={onLocationUpdate} />
       <MapUpdater lat={mapCenter[0]} lng={mapCenter[1]} />
       <MapResizer trigger={resizeTrigger} />
     </MapContainer>
@@ -208,7 +210,7 @@ export function MapComponent({ initialLat, initialLon, onLocationSelect }: MapCo
     (lat: number, lng: number) => {
       const newCenter: [number, number] = [lat, lng]
       setMapCenter(newCenter)
-      onLocationSelect(lat.toFixed(7), lng.toFixed(7))
+      onLocationSelect?.(lat.toFixed(7), lng.toFixed(7))
     },
     [onLocationSelect],
   )
@@ -223,7 +225,7 @@ export function MapComponent({ initialLat, initialLon, onLocationSelect }: MapCo
       if (!isNaN(latNum) && !isNaN(lonNum)) {
         const newCenter: [number, number] = [latNum, lonNum]
         setMapCenter(newCenter)
-        onLocationSelect(lat, lon)
+        onLocationSelect?.(lat, lon)
       }
     },
     [onLocationSelect],
