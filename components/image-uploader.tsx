@@ -9,11 +9,10 @@ import { Label } from "@/components/ui/label"
 import { Loader2, Upload, X, Check, AlertTriangle, ImageIcon, ExternalLink } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
-import { useToast } from "@/components/ui/use-toast"
 
 interface ImageUploaderProps {
-  value?: string
-  onChange?: (value: string) => void
+  value: string
+  onChange: (value: string) => void
 }
 
 export function ImageUploader({ value, onChange }: ImageUploaderProps) {
@@ -33,9 +32,6 @@ export function ImageUploader({ value, onChange }: ImageUploaderProps) {
     imgbb_data?: any
   } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [file, setFile] = useState<File | null>(null)
-  const { toast } = useToast()
-  const [imageUrl, setImageUrl] = useState<string | null>(null)
 
   // Function to compress an image using canvas
   const compressImage = useCallback(async (file: File, maxSizeMB = 2): Promise<Blob> => {
@@ -144,7 +140,6 @@ export function ImageUploader({ value, onChange }: ImageUploaderProps) {
     setUploadProgress(0)
     setCompressionStats(null)
     setUploadInfo(null)
-    setFile(file)
 
     try {
       // Create a local preview
@@ -201,7 +196,7 @@ export function ImageUploader({ value, onChange }: ImageUploaderProps) {
       setUploadProgress(100)
 
       // Update with uploaded image URL
-      onChange?.(result.url)
+      onChange(result.url)
       setPreviewUrl(result.url)
       setSuccess(true)
       setUploadInfo({
@@ -224,14 +219,12 @@ export function ImageUploader({ value, onChange }: ImageUploaderProps) {
   }
 
   const handleClearImage = () => {
-    onChange?.("")
+    onChange("")
     setPreviewUrl(null)
     setSuccess(false)
     setWarning(null)
     setCompressionStats(null)
     setUploadInfo(null)
-    setFile(null)
-    setImageUrl(null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
@@ -241,13 +234,12 @@ export function ImageUploader({ value, onChange }: ImageUploaderProps) {
     navigator.clipboard.readText().then(
       (text) => {
         if (text.match(/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)/i)) {
-          onChange?.(text)
+          onChange(text)
           setPreviewUrl(text)
           setSuccess(true)
           setWarning(null)
           setError(null)
           setUploadInfo({ source: "url" })
-          setImageUrl(text)
         } else {
           setError("The clipboard content doesn't appear to be an image URL")
         }
@@ -258,49 +250,6 @@ export function ImageUploader({ value, onChange }: ImageUploaderProps) {
     )
   }
 
-  const handleUpload = async () => {
-    if (!file) {
-      toast({
-        title: "No file selected",
-        description: "Please select an image file to upload.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setIsUploading(true)
-    const formData = new FormData()
-    formData.append("image", file)
-
-    try {
-      const response = await fetch("/api/upload-image", {
-        method: "POST",
-        body: formData,
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setImageUrl(data.url)
-        onChange?.(data.url)
-        toast({
-          title: "Upload successful",
-          description: "Image uploaded and URL generated.",
-        })
-      } else {
-        const errorData = await response.json()
-        throw new Error(errorData.message || "Failed to upload image.")
-      }
-    } catch (error: any) {
-      toast({
-        title: "Upload failed",
-        description: error.message || "An unexpected error occurred during upload.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsUploading(false)
-    }
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex items-end gap-2">
@@ -308,19 +257,17 @@ export function ImageUploader({ value, onChange }: ImageUploaderProps) {
           <Label htmlFor="image-url">Image URL</Label>
           <Input
             id="image-url"
-            value={previewUrl || ""}
+            value={value}
             onChange={(e) => {
-              onChange?.(e.target.value)
+              onChange(e.target.value)
               if (e.target.value) {
                 setPreviewUrl(e.target.value)
                 setSuccess(false)
                 setWarning(null)
                 setError(null)
                 setUploadInfo(null)
-                setImageUrl(e.target.value)
               } else {
                 setPreviewUrl(null)
-                setImageUrl(null)
               }
             }}
             placeholder="https://... or data:image/..."
@@ -332,8 +279,8 @@ export function ImageUploader({ value, onChange }: ImageUploaderProps) {
           variant="outline"
           size="icon"
           onClick={handleClearImage}
-          disabled={!previewUrl}
-          className="h-10 w-10 bg-transparent"
+          disabled={!value && !previewUrl}
+          className="h-10 w-10"
         >
           <X className="h-4 w-4" />
           <span className="sr-only">Clear</span>
@@ -371,13 +318,7 @@ export function ImageUploader({ value, onChange }: ImageUploaderProps) {
             )}
           </Button>
 
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handlePasteUrl}
-            disabled={isUploading}
-            className="flex-1 bg-transparent"
-          >
+          <Button type="button" variant="outline" onClick={handlePasteUrl} disabled={isUploading} className="flex-1">
             <ImageIcon className="mr-2 h-4 w-4" />
             Paste Image URL
           </Button>
@@ -458,7 +399,6 @@ export function ImageUploader({ value, onChange }: ImageUploaderProps) {
               onError={() => {
                 setError("Failed to load image preview. The URL may be invalid.")
                 setPreviewUrl(null)
-                setImageUrl(null)
               }}
             />
           </div>

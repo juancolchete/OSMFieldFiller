@@ -1,6 +1,3 @@
-// This file was added in a previous turn to implement the OSM form.
-// It is included here in full as per instructions.
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -11,11 +8,13 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Copy, Download, Edit3, RotateCcw } from "lucide-react"
+import { Copy, Download, Github, Edit3, RotateCcw } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { MapPicker } from "@/components/map-picker"
+import { GithubIssueForm } from "@/components/github-issue-form"
 import { ShopTypeSelector } from "@/components/shop-type-selector"
 import { CbtcSelector } from "@/components/cbtc-selector"
+// Import the ImageUploader component at the top of the file
 import { ImageUploader } from "@/components/image-uploader"
 
 // First, add a helper function to format the current date as YYYY-MM-DD
@@ -256,13 +255,7 @@ const shopAndAmenityTypes = [
   { value: "vending_machine", label: "Amenity: Vending Machine", category: "Amenities - Others" },
 ]
 
-interface OsmFormProps {
-  osmData: any
-  onOsmDataChange: (data: any) => void
-  selectedLocation: { lat: string; lon: string } | null
-}
-
-export function OsmForm({ osmData, onOsmDataChange, selectedLocation }: OsmFormProps) {
+export function OsmForm() {
   // Predefined OSM tag keys
   const tagGroups = {
     basic: [
@@ -308,8 +301,8 @@ export function OsmForm({ osmData, onOsmDataChange, selectedLocation }: OsmFormP
   }
 
   // State for coordinates
-  const [latitude, setLatitude] = useState(selectedLocation?.lat || "-19.8430171")
-  const [longitude, setLongitude] = useState(selectedLocation?.lon || "-43.9191272")
+  const [latitude, setLatitude] = useState("-19.8430171")
+  const [longitude, setLongitude] = useState("-43.9191272")
 
   // State for tag values - Set OBTC default to "UAIBIT"
   const [tagValues, setTagValues] = useState<Record<string, string>>({
@@ -326,8 +319,8 @@ export function OsmForm({ osmData, onOsmDataChange, selectedLocation }: OsmFormP
   // State for copy button
   const [copied, setCopied] = useState(false)
 
-  // State for active tab (within the form itself, not the main app tabs)
-  const [internalTab, setInternalTab] = useState("basic")
+  // State for active tab
+  const [activeTab, setActiveTab] = useState("form")
 
   // Effect to parse manual tags when switching back to form mode
   useEffect(() => {
@@ -337,30 +330,14 @@ export function OsmForm({ osmData, onOsmDataChange, selectedLocation }: OsmFormP
     }
   }, [isManualEdit, manualEditApplied])
 
-  // Sync external selectedLocation prop with internal state
-  useEffect(() => {
-    if (selectedLocation) {
-      setLatitude(selectedLocation.lat)
-      setLongitude(selectedLocation.lon)
-    }
-  }, [selectedLocation])
-
   // Update a tag value
   const updateTagValue = (key: string, value: string) => {
-    setTagValues((prev) => {
-      const newValues = { ...prev, [key]: value }
-      onOsmDataChange(generateKeyValueFormat(newValues, latitude, longitude)) // Update parent
-      return newValues
-    })
+    setTagValues((prev) => ({ ...prev, [key]: value }))
   }
 
   // Handle checkbox changes
   const handleCheckboxChange = (key: string, checked: boolean) => {
-    setTagValues((prev) => {
-      const newValues = { ...prev, [key]: checked ? "yes" : "no" }
-      onOsmDataChange(generateKeyValueFormat(newValues, latitude, longitude)) // Update parent
-      return newValues
-    })
+    setTagValues((prev) => ({ ...prev, [key]: checked ? "yes" : "no" }))
   }
 
   // Handle shop/amenity selection
@@ -382,7 +359,6 @@ export function OsmForm({ osmData, onOsmDataChange, selectedLocation }: OsmFormP
       }
 
       setTagValues(newTagValues)
-      onOsmDataChange(generateKeyValueFormat(newTagValues, latitude, longitude)) // Update parent
     }
   }
 
@@ -390,32 +366,29 @@ export function OsmForm({ osmData, onOsmDataChange, selectedLocation }: OsmFormP
   const handleLocationSelect = (lat: string, lon: string) => {
     setLatitude(lat)
     setLongitude(lon)
-    onOsmDataChange(generateKeyValueFormat(tagValues, lat, lon)) // Update parent
   }
 
-  // Generate key=value format (helper function to be used internally and for parent updates)
-  const generateKeyValueFormat = (currentTagValues: Record<string, string>, currentLat: string, currentLon: string) => {
+  // Generate key=value format
+  const generateKeyValueFormat = () => {
     // Filter out empty values and the shop_amenity field (which is just for UI)
-    const filledTags = Object.entries(currentTagValues).filter(
-      ([key, value]) => value.trim() !== "" && key !== "shop_amenity",
-    )
+    const filledTags = Object.entries(tagValues).filter(([key, value]) => value.trim() !== "" && key !== "shop_amenity")
 
     // Add coordinates
-    const output = [`lat=${currentLat}`, `lon=${currentLon}`, ...filledTags.map(([key, value]) => `${key}=${value}`)]
+    const output = [`lat=${latitude}`, `lon=${longitude}`, ...filledTags.map(([key, value]) => `${key}=${value}`)]
 
     return output.join("\n")
   }
 
   // Get the final tags (either generated or manual)
   const getFinalTags = () => {
-    return isManualEdit ? manualTags : generateKeyValueFormat(tagValues, latitude, longitude)
+    return isManualEdit ? manualTags : generateKeyValueFormat()
   }
 
   // Toggle manual edit mode
   const toggleManualEdit = () => {
     if (!isManualEdit) {
       // Switching to manual edit - populate with current generated tags
-      setManualTags(generateKeyValueFormat(tagValues, latitude, longitude))
+      setManualTags(generateKeyValueFormat())
     } else {
       // Switching back to form mode - mark that we need to parse manual tags
       setManualEditApplied(true)
@@ -427,8 +400,6 @@ export function OsmForm({ osmData, onOsmDataChange, selectedLocation }: OsmFormP
   const parseManualTagsToForm = () => {
     const lines = manualTags.split("\n").filter((line) => line.trim() !== "")
     const newTagValues: Record<string, string> = {}
-    let parsedLat = latitude
-    let parsedLon = longitude
 
     lines.forEach((line) => {
       const [key, ...valueParts] = line.split("=")
@@ -436,24 +407,21 @@ export function OsmForm({ osmData, onOsmDataChange, selectedLocation }: OsmFormP
         const value = valueParts.join("=") // In case the value contains '='
 
         if (key === "lat") {
-          parsedLat = value
+          setLatitude(value)
         } else if (key === "lon") {
-          parsedLon = value
+          setLongitude(value)
         } else {
           newTagValues[key] = value
         }
       }
     })
 
-    setLatitude(parsedLat)
-    setLongitude(parsedLon)
     setTagValues(newTagValues)
-    onOsmDataChange(generateKeyValueFormat(newTagValues, parsedLat, parsedLon)) // Update parent
   }
 
   // Reset to form-generated tags
   const resetToFormTags = () => {
-    setManualTags(generateKeyValueFormat(tagValues, latitude, longitude))
+    setManualTags(generateKeyValueFormat())
   }
 
   // Copy to clipboard
@@ -484,6 +452,29 @@ export function OsmForm({ osmData, onOsmDataChange, selectedLocation }: OsmFormP
       return tagValues.amenity
     }
     return ""
+  }
+
+  // Update address fields when a search result is selected
+  const updateAddressFromSearch = (displayName: string) => {
+    // This is a simple implementation - in a real app, you might want to parse the address more carefully
+    const parts = displayName.split(", ")
+
+    if (parts.length >= 3) {
+      // Try to extract some address components
+      // This is a very simplified approach and might need adjustment based on the actual format of results
+      updateTagValue("addr:city", parts[parts.length - 3] || "")
+
+      // If there's a postal code in the format "12345" or similar at the end
+      const postalCodeMatch = displayName.match(/\b\d{5,}\b/)
+      if (postalCodeMatch) {
+        updateTagValue("addr:postcode", postalCodeMatch[0])
+      }
+
+      // Try to get the street name - this is very approximate
+      if (parts.length > 3) {
+        updateTagValue("addr:street", parts[0])
+      }
+    }
   }
 
   // Render form field based on tag definition
@@ -598,124 +589,142 @@ export function OsmForm({ osmData, onOsmDataChange, selectedLocation }: OsmFormP
     <main className="container mx-auto py-8 px-4">
       <h1 className="text-3xl font-bold text-center mb-8">OSM Tag Form</h1>
 
-      <div className="grid md:grid-cols-2 gap-8">
-        <div>
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Location</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <MapPicker
-                  initialLat={Number.parseFloat(latitude)}
-                  initialLon={Number.parseFloat(longitude)}
-                  onLocationSelect={handleLocationSelect}
-                />
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="form">Form</TabsTrigger>
+          <TabsTrigger value="github">Create GitHub Issue</TabsTrigger>
+        </TabsList>
 
-                <div className="grid grid-cols-2 gap-4 mt-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="latitude">Latitude</Label>
-                    <Input id="latitude" value={latitude} onChange={(e) => setLatitude(e.target.value)} />
+        <TabsContent value="form" className="mt-6">
+          <div className="grid md:grid-cols-2 gap-8">
+            <div>
+              <Card className="mb-6">
+                <CardHeader>
+                  <CardTitle>Location</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <MapPicker
+                      initialLat={Number.parseFloat(latitude)}
+                      initialLon={Number.parseFloat(longitude)}
+                      onLocationSelect={handleLocationSelect}
+                    />
+
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="latitude">Latitude</Label>
+                        <Input id="latitude" value={latitude} onChange={(e) => setLatitude(e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="longitude">Longitude</Label>
+                        <Input id="longitude" value={longitude} onChange={(e) => setLongitude(e.target.value)} />
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="longitude">Longitude</Label>
-                    <Input id="longitude" value={longitude} onChange={(e) => setLongitude(e.target.value)} />
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
 
-          {!isManualEdit && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Tag Information</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Tabs defaultValue="basic" value={internalTab} onValueChange={setInternalTab}>
-                  <TabsList className="grid grid-cols-5 mb-4">
-                    <TabsTrigger value="basic">Basic</TabsTrigger>
-                    <TabsTrigger value="address">Address</TabsTrigger>
-                    <TabsTrigger value="payment">Payment</TabsTrigger>
-                    <TabsTrigger value="currency">Currency</TabsTrigger>
-                    <TabsTrigger value="custom">Custom</TabsTrigger>
-                  </TabsList>
+              {!isManualEdit && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Tag Information</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Tabs defaultValue="basic">
+                      <TabsList className="grid grid-cols-5 mb-4">
+                        <TabsTrigger value="basic">Basic</TabsTrigger>
+                        <TabsTrigger value="address">Address</TabsTrigger>
+                        <TabsTrigger value="payment">Payment</TabsTrigger>
+                        <TabsTrigger value="currency">Currency</TabsTrigger>
+                        <TabsTrigger value="custom">Custom</TabsTrigger>
+                      </TabsList>
 
-                  {Object.entries(tagGroups).map(([group, tags]) => (
-                    <TabsContent key={group} value={group} className="space-y-4">
-                      {tags.map(renderField)}
-                    </TabsContent>
-                  ))}
-                </Tabs>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+                      {Object.entries(tagGroups).map(([group, tags]) => (
+                        <TabsContent key={group} value={group} className="space-y-4">
+                          {tags.map(renderField)}
+                        </TabsContent>
+                      ))}
+                    </Tabs>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
 
-        <div>
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Generated OSM Tags</CardTitle>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={toggleManualEdit}
-                  className="flex items-center gap-2 bg-transparent"
-                >
-                  <Edit3 className="h-4 w-4" />
-                  {isManualEdit ? "Form Mode" : "Manual Edit"}
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {isManualEdit ? (
-                <div className="space-y-4">
+            <div>
+              <Card>
+                <CardHeader>
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="manual-tags">Edit Tags Manually</Label>
-                    <Button variant="ghost" size="sm" onClick={resetToFormTags} className="flex items-center gap-2">
-                      <RotateCcw className="h-4 w-4" />
-                      Reset to Form
+                    <CardTitle>Generated OSM Tags</CardTitle>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={toggleManualEdit}
+                      className="flex items-center gap-2 bg-transparent"
+                    >
+                      <Edit3 className="h-4 w-4" />
+                      {isManualEdit ? "Form Mode" : "Manual Edit"}
                     </Button>
                   </div>
-                  <Textarea
-                    id="manual-tags"
-                    value={manualTags}
-                    onChange={(e) => setManualTags(e.target.value)}
-                    className="min-h-[500px] font-mono text-sm"
-                    placeholder="lat=-19.8430171
+                </CardHeader>
+                <CardContent>
+                  {isManualEdit ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="manual-tags">Edit Tags Manually</Label>
+                        <Button variant="ghost" size="sm" onClick={resetToFormTags} className="flex items-center gap-2">
+                          <RotateCcw className="h-4 w-4" />
+                          Reset to Form
+                        </Button>
+                      </div>
+                      <Textarea
+                        id="manual-tags"
+                        value={manualTags}
+                        onChange={(e) => setManualTags(e.target.value)}
+                        className="min-h-[500px] font-mono text-sm"
+                        placeholder="lat=-19.8430171
 lon=-43.9191272
 name=Example Location
 shop=convenience
 ..."
-                  />
-                  <div className="text-xs text-muted-foreground">
-                    Format: key=value (one per line). Changes will be reflected when you switch back to Form Mode.
-                  </div>
-                </div>
-              ) : (
-                <ScrollArea className="h-[600px] w-full rounded-md border p-4 mb-4">
-                  <pre className="text-sm font-mono whitespace-pre-wrap">
-                    {generateKeyValueFormat(tagValues, latitude, longitude)}
-                  </pre>
-                </ScrollArea>
-              )}
+                      />
+                      <div className="text-xs text-muted-foreground">
+                        Format: key=value (one per line). Changes will be reflected when you switch back to Form Mode.
+                      </div>
+                    </div>
+                  ) : (
+                    <ScrollArea className="h-[600px] w-full rounded-md border p-4 mb-4">
+                      <pre className="text-sm font-mono whitespace-pre-wrap">{generateKeyValueFormat()}</pre>
+                    </ScrollArea>
+                  )}
 
-              <div className="flex gap-4 mt-4">
-                <Button variant="outline" className="flex-1 bg-transparent" onClick={copyToClipboard}>
-                  <Copy className="mr-2 h-4 w-4" />
-                  {copied ? "Copied!" : "Copy Tags"}
-                </Button>
-                <Button className="flex-1" onClick={downloadText}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Download Tags
-                </Button>
-                {/* Removed direct GitHub button, as it's now handled by the parent Tabs */}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+                  <div className="flex gap-4 mt-4">
+                    <Button variant="outline" className="flex-1 bg-transparent" onClick={copyToClipboard}>
+                      <Copy className="mr-2 h-4 w-4" />
+                      {copied ? "Copied!" : "Copy Tags"}
+                    </Button>
+                    <Button className="flex-1" onClick={downloadText}>
+                      <Download className="mr-2 h-4 w-4" />
+                      Download Tags
+                    </Button>
+                    <Button variant="secondary" className="flex-1" onClick={() => setActiveTab("github")}>
+                      <Github className="mr-2 h-4 w-4" />
+                      Create Issue
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="github" className="mt-6">
+          <GithubIssueForm
+            osmData={getFinalTags()}
+            locationName={tagValues["name"] || "New Location"}
+            onBack={() => setActiveTab("form")}
+          />
+        </TabsContent>
+      </Tabs>
     </main>
   )
 }

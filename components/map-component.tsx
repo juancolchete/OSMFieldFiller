@@ -2,53 +2,45 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet"
-import "leaflet/dist/leaflet.css"
-import "leaflet-defaulticon-compatibility/dist/leaflet-defaulticon-compatibility.css"
-import "leaflet-defaulticon-compatibility"
-import L from "leaflet" // Direct import of Leaflet
 import { MapSearch } from "@/components/map-search"
 import { Maximize2, Minimize2, Map, Satellite, Layers } from "lucide-react"
 import { createPortal } from "react-dom"
 
-// Fix Leaflet marker icon issue in Next.js
-// Define the icon directly here, as this component is now guaranteed to be client-side
-const icon = L.icon({
-  iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-})
+let L: any = null
 
 interface MapComponentProps {
   initialLat: number
   initialLon: number
-  onLocationSelect?: (lat: string, lon: string) => void
+  onLocationSelect: (lat: string, lon: string) => void
 }
 
 // Component to handle map click events
 function LocationMarker({
   onLocationSelect,
+  currentPosition,
+  leafletIcon,
 }: {
-  onLocationSelect?: (lat: string, lon: string) => void
+  onLocationSelect: (lat: number, lng: number) => void
+  currentPosition: [number, number]
+  leafletIcon: any
 }) {
-  const [position, setPosition] = useState<L.LatLng | null>(null)
+  const [position, setPosition] = useState<any | null>(null)
+
   const map = useMapEvents({
     click(e) {
       setPosition(e.latlng)
-      onLocationSelect?.(e.latlng.lat.toFixed(7), e.latlng.lng.toFixed(7))
-    },
-    locationfound(e) {
-      setPosition(e.latlng)
-      map.flyTo(e.latlng, map.getZoom())
-      onLocationSelect?.(e.latlng.lat.toFixed(7), e.latlng.lng.toFixed(7))
+      onLocationSelect(e.latlng.lat, e.latlng.lng)
     },
   })
 
+  // Update position when currentPosition changes
   useEffect(() => {
-    map.locate()
-  }, [map])
+    if (currentPosition && L) {
+      setPosition(new L.LatLng(currentPosition[0], currentPosition[1]))
+    }
+  }, [currentPosition])
 
-  return position === null ? null : <Marker position={position}></Marker>
+  return position === null ? null : <Marker position={position} icon={leafletIcon} />
 }
 
 // Component to update map view when search result is selected
@@ -86,6 +78,7 @@ function MapContent({
   isFullscreen,
   resizeTrigger,
   mapType,
+  leafletIcon,
 }: {
   mapCenter: [number, number]
   onLocationUpdate: (lat: number, lng: number) => void
@@ -93,6 +86,7 @@ function MapContent({
   isFullscreen: boolean
   resizeTrigger: number
   mapType: "street" | "satellite" | "hybrid"
+  leafletIcon: any
 }) {
   return (
     <MapContainer
@@ -133,8 +127,8 @@ function MapContent({
           />
         </>
       )}
-      <Marker position={mapCenter} icon={icon} />
-      <LocationMarker onLocationSelect={onLocationUpdate} />
+      <Marker position={mapCenter} icon={leafletIcon} />
+      <LocationMarker onLocationSelect={onLocationUpdate} currentPosition={mapCenter} leafletIcon={leafletIcon} />
       <MapUpdater lat={mapCenter[0]} lng={mapCenter[1]} />
       <MapResizer trigger={resizeTrigger} />
     </MapContainer>
@@ -143,10 +137,42 @@ function MapContent({
 
 export function MapComponent({ initialLat, initialLon, onLocationSelect }: MapComponentProps) {
   const [mounted, setMounted] = useState(false)
+  const [leafletLoaded, setLeafletLoaded] = useState(false)
+  const [leafletIcon, setLeafletIcon] = useState<any>(null)
   const [mapCenter, setMapCenter] = useState<[number, number]>([initialLat, initialLon])
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [resizeTrigger, setResizeTrigger] = useState(0)
   const [mapType, setMapType] = useState<"street" | "satellite" | "hybrid">("hybrid")
+
+  useEffect(() => {
+    const loadLeaflet = async () => {
+      if (typeof window !== "undefined") {
+        // Import Leaflet CSS
+        const leafletCSS = document.createElement("link")
+        leafletCSS.rel = "stylesheet"
+        leafletCSS.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        document.head.appendChild(leafletCSS)
+
+        // Import Leaflet JS
+        const leafletModule = await import("leaflet")
+        L = leafletModule.default
+
+        // Fix Leaflet marker icon issue in Next.js
+        const icon = L.icon({
+          iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+          shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+        })
+
+        setLeafletIcon(icon)
+        setLeafletLoaded(true)
+      }
+    }
+
+    loadLeaflet()
+    setMounted(true)
+  }, [])
 
   // Handle fullscreen toggle
   const toggleFullscreen = useCallback(() => {
@@ -210,7 +236,7 @@ export function MapComponent({ initialLat, initialLon, onLocationSelect }: MapCo
     (lat: number, lng: number) => {
       const newCenter: [number, number] = [lat, lng]
       setMapCenter(newCenter)
-      onLocationSelect?.(lat.toFixed(7), lng.toFixed(7))
+      onLocationSelect(lat.toFixed(7), lng.toFixed(7))
     },
     [onLocationSelect],
   )
@@ -225,7 +251,7 @@ export function MapComponent({ initialLat, initialLon, onLocationSelect }: MapCo
       if (!isNaN(latNum) && !isNaN(lonNum)) {
         const newCenter: [number, number] = [latNum, lonNum]
         setMapCenter(newCenter)
-        onLocationSelect?.(lat, lon)
+        onLocationSelect(lat, lon)
       }
     },
     [onLocationSelect],
@@ -243,12 +269,7 @@ export function MapComponent({ initialLat, initialLon, onLocationSelect }: MapCo
     }
   }
 
-  // Handle client-side rendering
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
+  if (!mounted || !leafletLoaded || !leafletIcon) {
     return (
       <div className="h-[400px] bg-gray-100 flex items-center justify-center rounded-md border">Loading map...</div>
     )
@@ -299,6 +320,7 @@ export function MapComponent({ initialLat, initialLon, onLocationSelect }: MapCo
           isFullscreen={false}
           resizeTrigger={resizeTrigger}
           mapType={mapType}
+          leafletIcon={leafletIcon}
         />
       </div>
     </div>
@@ -349,6 +371,7 @@ export function MapComponent({ initialLat, initialLon, onLocationSelect }: MapCo
           isFullscreen={true}
           resizeTrigger={resizeTrigger}
           mapType={mapType}
+          leafletIcon={leafletIcon}
         />
       </div>
     </div>
