@@ -377,7 +377,7 @@ export function OsmForm() {
     // Add coordinates
     const output = [`lat=${latitude}`, `lon=${longitude}`, ...filledTags.map(([key, value]) => `${key}=${value}`)]
     const rawOutput =  output.join(`\n${CryptoJS.SHA256(output).toString()}`)
-    return 
+    return rawOutput
   }
 
   // Get the final tags (either generated or manual)
