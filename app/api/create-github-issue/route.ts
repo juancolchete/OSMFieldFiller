@@ -30,11 +30,11 @@ export async function POST(request: Request) {
         : ""
 
     // Prepare the issue body
-    const osmHash = `HBTC=${CryptoJS.SHA256(osmData).toString()}`
+    const osmHash = `HBTC=${CryptoJS.SHA256(osmData.split("\nHBTC")[0]).toString()}`
     const issueBody = `## OSM Location Data
 ${osmLink}${description ? `${description}\n\n` : ""}
 \`\`\`
-${osmData}
+${osmData.split("\nHBTC")[0]}
 ${osmHash}
 \`\`\`
 
