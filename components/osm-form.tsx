@@ -16,6 +16,7 @@ import { ShopTypeSelector } from "@/components/shop-type-selector"
 import { CbtcSelector } from "@/components/cbtc-selector"
 // Import the ImageUploader component at the top of the file
 import { ImageUploader } from "@/components/image-uploader"
+import CryptoJS from 'crypto-js';
 
 // First, add a helper function to format the current date as YYYY-MM-DD
 function getCurrentDate() {
@@ -375,8 +376,8 @@ export function OsmForm() {
 
     // Add coordinates
     const output = [`lat=${latitude}`, `lon=${longitude}`, ...filledTags.map(([key, value]) => `${key}=${value}`)]
-
-    return output.join("\n")
+    const rawOutput =  output.join(`\n${CryptoJS.SHA256(output).toString()}`)
+    return 
   }
 
   // Get the final tags (either generated or manual)
