@@ -1,177 +1,88 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet"
+import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet"
 import { MapSearch } from "@/components/map-search"
 import { Maximize2, Minimize2, Map, Satellite, Layers } from "lucide-react"
 import { createPortal } from "react-dom"
-
-let L: any = null
+import type { LatLngExpression, Icon, PointExpression } from "leaflet"
 
 interface MapComponentProps {
   initialLat: number
   initialLon: number
   onLocationSelect: (lat: string, lon: string) => void
+  markerLat?: number
+  markerLon?: number
 }
 
-// Component to handle map click events
+// Custom hook for handling map clicks and updating marker position
 function LocationMarker({
   onLocationSelect,
-  currentPosition,
-  leafletIcon,
+  markerPosition,
+  customIcon,
 }: {
-  onLocationSelect: (lat: number, lng: number) => void
-  currentPosition: [number, number]
-  leafletIcon: any
+  onLocationSelect: (lat: string, lon: string) => void
+  markerPosition: LatLngExpression | null
+  customIcon: Icon | null
 }) {
-  const [position, setPosition] = useState<any | null>(null)
-
-  const map = useMapEvents({
+  useMapEvents({
     click(e) {
-      setPosition(e.latlng)
-      onLocationSelect(e.latlng.lat, e.latlng.lng)
+      onLocationSelect(e.latlng.lat.toString(), e.latlng.lng.toString())
     },
   })
 
-  // Update position when currentPosition changes
-  useEffect(() => {
-    if (currentPosition && L) {
-      setPosition(new L.LatLng(currentPosition[0], currentPosition[1]))
-    }
-  }, [currentPosition])
-
-  return position === null ? null : <Marker position={position} icon={leafletIcon} />
+  return markerPosition && customIcon ? <Marker position={markerPosition} icon={customIcon} /> : null
 }
 
-// Component to update map view when search result is selected
-function MapUpdater({ lat, lng }: { lat: number; lng: number }) {
-  const map = useMap()
-
-  useEffect(() => {
-    map.setView([lat, lng], 16)
-  }, [map, lat, lng])
-
-  return null
-}
-
-// Component to handle map resize
-function MapResizer({ trigger }: { trigger: number }) {
-  const map = useMap()
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      map.invalidateSize(true)
-      map.getContainer().focus()
-    }, 150)
-
-    return () => clearTimeout(timer)
-  }, [trigger, map])
-
-  return null
-}
-
-// Map content component that can be rendered in different containers
-function MapContent({
-  mapCenter,
-  onLocationUpdate,
-  onSearchResultSelect,
-  isFullscreen,
-  resizeTrigger,
-  mapType,
-  leafletIcon,
-}: {
-  mapCenter: [number, number]
-  onLocationUpdate: (lat: number, lng: number) => void
-  onSearchResultSelect: (lat: string, lon: string, name?: string) => void
-  isFullscreen: boolean
-  resizeTrigger: number
-  mapType: "street" | "satellite" | "hybrid"
-  leafletIcon: any
-}) {
-  return (
-    <MapContainer
-      center={mapCenter}
-      zoom={13}
-      style={{
-        height: "100%",
-        width: "100%",
-      }}
-      key={`map-${isFullscreen ? "fullscreen" : "normal"}-${resizeTrigger}-${mapType}`}
-    >
-      {mapType === "street" ? (
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          maxZoom={19}
-        />
-      ) : mapType === "satellite" ? (
-        <TileLayer
-          attribution="Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
-          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-          maxZoom={19}
-        />
-      ) : (
-        <>
-          {/* Hybrid view: Satellite imagery with street labels */}
-          <TileLayer
-            attribution="Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
-            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-            maxZoom={19}
-          />
-          {/* Street labels and numbers overlay */}
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            opacity={0.6}
-            maxZoom={19}
-          />
-        </>
-      )}
-      <Marker position={mapCenter} icon={leafletIcon} />
-      <LocationMarker onLocationSelect={onLocationUpdate} currentPosition={mapCenter} leafletIcon={leafletIcon} />
-      <MapUpdater lat={mapCenter[0]} lng={mapCenter[1]} />
-      <MapResizer trigger={resizeTrigger} />
-    </MapContainer>
-  )
-}
-
-export function MapComponent({ initialLat, initialLon, onLocationSelect }: MapComponentProps) {
+export function MapComponent({ initialLat, initialLon, onLocationSelect, markerLat, markerLon }: MapComponentProps) {
   const [mounted, setMounted] = useState(false)
-  const [leafletLoaded, setLeafletLoaded] = useState(false)
-  const [leafletIcon, setLeafletIcon] = useState<any>(null)
-  const [mapCenter, setMapCenter] = useState<[number, number]>([initialLat, initialLon])
+  const [center, setCenter] = useState<LatLngExpression>([initialLat, initialLon])
+  const [markerPosition, setMarkerPosition] = useState<LatLngExpression | null>(
+    markerLat && markerLon ? [markerLat, markerLon] : null,
+  )
+  const [customIcon, setCustomIcon] = useState<Icon | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [resizeTrigger, setResizeTrigger] = useState(0)
   const [mapType, setMapType] = useState<"street" | "satellite" | "hybrid">("hybrid")
+  const [leafletReady, setLeafletReady] = useState(false)
 
   useEffect(() => {
-    const loadLeaflet = async () => {
-      if (typeof window !== "undefined") {
-        // Import Leaflet CSS
-        const leafletCSS = document.createElement("link")
-        leafletCSS.rel = "stylesheet"
-        leafletCSS.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        document.head.appendChild(leafletCSS)
+    // Update center if initialLat/Lon change
+    setCenter([initialLat, initialLon])
+  }, [initialLat, initialLon])
 
-        // Import Leaflet JS
-        const leafletModule = await import("leaflet")
-        L = leafletModule.default
-
-        // Fix Leaflet marker icon issue in Next.js
-        const icon = L.icon({
-          iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-          shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-          iconSize: [25, 41],
-          iconAnchor: [12, 41],
-        })
-
-        setLeafletIcon(icon)
-        setLeafletLoaded(true)
-      }
+  useEffect(() => {
+    // Update marker position if markerLat/Lon change
+    if (markerLat !== undefined && markerLon !== undefined) {
+      setMarkerPosition([markerLat, markerLon])
+    } else {
+      setMarkerPosition(null)
     }
+  }, [markerLat, markerLon])
 
-    loadLeaflet()
-    setMounted(true)
+  useEffect(() => {
+    // Dynamically import Leaflet's L object and set up the default icon
+    // This ensures L is available only on the client side.
+    import("leaflet")
+      .then((L) => {
+        // Move CSS imports here to ensure they are only loaded client-side
+        import("leaflet/dist/leaflet.css")
+        import("leaflet-defaulticon-compatibility/dist/leaflet-defaulticon-compatibility.css")
+        import("leaflet-defaulticon-compatibility")
+
+        const defaultIcon = new L.Icon({
+          iconUrl: "/marker-icon.png",
+          iconRetinaUrl: "/marker-icon-2x.png",
+          shadowUrl: "/marker-shadow.png",
+          iconSize: [25, 41] as PointExpression,
+          iconAnchor: [12, 41] as PointExpression,
+          popupAnchor: [1, -34] as PointExpression,
+          shadowSize: [41, 41] as PointExpression,
+        })
+        setCustomIcon(defaultIcon)
+        setLeafletReady(true) // Set leafletReady to true once L and icon are ready
+      })
+      .catch((error) => console.error("Error loading Leaflet L object:", error))
   }, [])
 
   // Handle fullscreen toggle
@@ -220,43 +131,6 @@ export function MapComponent({ initialLat, initialLon, onLocationSelect }: MapCo
     }
   }, [isFullscreen])
 
-  useEffect(() => {
-    // Update map center when initialLat or initialLon props change
-    const newLat = Number.parseFloat(initialLat.toString())
-    const newLon = Number.parseFloat(initialLon.toString())
-
-    if (!isNaN(newLat) && !isNaN(newLon)) {
-      const newCenter: [number, number] = [newLat, newLon]
-      setMapCenter(newCenter)
-    }
-  }, [initialLat, initialLon])
-
-  // Handle marker position updates
-  const handleLocationUpdate = useCallback(
-    (lat: number, lng: number) => {
-      const newCenter: [number, number] = [lat, lng]
-      setMapCenter(newCenter)
-      onLocationSelect(lat.toFixed(7), lng.toFixed(7))
-    },
-    [onLocationSelect],
-  )
-
-  // Handle search result selection
-  const handleSearchResultSelect = useCallback(
-    (lat: string, lon: string, name?: string) => {
-      console.log("Search result selected:", { lat, lon, name })
-      const latNum = Number.parseFloat(lat)
-      const lonNum = Number.parseFloat(lon)
-
-      if (!isNaN(latNum) && !isNaN(lonNum)) {
-        const newCenter: [number, number] = [latNum, lonNum]
-        setMapCenter(newCenter)
-        onLocationSelect(lat, lon)
-      }
-    },
-    [onLocationSelect],
-  )
-
   // Get map type icon and title
   const getMapTypeInfo = () => {
     switch (mapType) {
@@ -269,7 +143,12 @@ export function MapComponent({ initialLat, initialLon, onLocationSelect }: MapCo
     }
   }
 
-  if (!mounted || !leafletLoaded || !leafletIcon) {
+  // Handle client-side rendering
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted || !leafletReady) {
     return (
       <div className="h-[400px] bg-gray-100 flex items-center justify-center rounded-md border">Loading map...</div>
     )
@@ -281,7 +160,7 @@ export function MapComponent({ initialLat, initialLon, onLocationSelect }: MapCo
   const normalMapView = (
     <div className="space-y-2">
       <div className="mb-3">
-        <MapSearch onLocationSelect={handleSearchResultSelect} />
+        <MapSearch onLocationSelect={onLocationSelect} />
       </div>
 
       <div className="h-[350px] rounded-md overflow-hidden border relative">
@@ -313,15 +192,52 @@ export function MapComponent({ initialLat, initialLon, onLocationSelect }: MapCo
           {mapType === "hybrid" && "Satellite + Streets"}
         </div>
 
-        <MapContent
-          mapCenter={mapCenter}
-          onLocationUpdate={handleLocationUpdate}
-          onSearchResultSelect={handleSearchResultSelect}
-          isFullscreen={false}
-          resizeTrigger={resizeTrigger}
-          mapType={mapType}
-          leafletIcon={leafletIcon}
-        />
+        <MapContainer
+          center={center}
+          zoom={13}
+          style={{
+            height: "100%",
+            width: "100%",
+          }}
+          key={`map-${isFullscreen ? "fullscreen" : "normal"}-${resizeTrigger}-${mapType}`}
+        >
+          {mapType === "street" ? (
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              maxZoom={19}
+            />
+          ) : mapType === "satellite" ? (
+            <TileLayer
+              attribution="Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              maxZoom={19}
+            />
+          ) : (
+            <>
+              {/* Hybrid view: Satellite imagery with street labels */}
+              <TileLayer
+                attribution="Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                maxZoom={19}
+              />
+              {/* Street labels and numbers overlay */}
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                opacity={0.6}
+                maxZoom={19}
+              />
+            </>
+          )}
+          {customIcon && (
+            <LocationMarker
+              onLocationSelect={onLocationSelect}
+              markerPosition={markerPosition}
+              customIcon={customIcon}
+            />
+          )}
+        </MapContainer>
       </div>
     </div>
   )
@@ -331,7 +247,7 @@ export function MapComponent({ initialLat, initialLon, onLocationSelect }: MapCo
     <div className="fixed inset-0 z-[9999] bg-white">
       {/* Search bar in fullscreen mode */}
       <div className="absolute top-4 left-4 z-[1000] w-80">
-        <MapSearch onLocationSelect={handleSearchResultSelect} />
+        <MapSearch onLocationSelect={onLocationSelect} />
       </div>
 
       {/* Map controls in fullscreen */}
@@ -364,15 +280,50 @@ export function MapComponent({ initialLat, initialLon, onLocationSelect }: MapCo
 
       {/* Fullscreen map */}
       <div className="w-full h-full">
-        <MapContent
-          mapCenter={mapCenter}
-          onLocationUpdate={handleLocationUpdate}
-          onSearchResultSelect={handleSearchResultSelect}
-          isFullscreen={true}
-          resizeTrigger={resizeTrigger}
-          mapType={mapType}
-          leafletIcon={leafletIcon}
-        />
+        <MapContainer
+          center={center}
+          zoom={13}
+          scrollWheelZoom={true}
+          className="h-full w-full"
+          key={`map-${isFullscreen ? "fullscreen" : "normal"}-${resizeTrigger}-${mapType}`}
+        >
+          {mapType === "street" ? (
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              maxZoom={19}
+            />
+          ) : mapType === "satellite" ? (
+            <TileLayer
+              attribution="Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              maxZoom={19}
+            />
+          ) : (
+            <>
+              {/* Hybrid view: Satellite imagery with street labels */}
+              <TileLayer
+                attribution="Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                maxZoom={19}
+              />
+              {/* Street labels and numbers overlay */}
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                opacity={0.6}
+                maxZoom={19}
+              />
+            </>
+          )}
+          {customIcon && (
+            <LocationMarker
+              onLocationSelect={onLocationSelect}
+              markerPosition={markerPosition}
+              customIcon={customIcon}
+            />
+          )}
+        </MapContainer>
       </div>
     </div>
   )

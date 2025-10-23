@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server"
-import CryptoJS from 'crypto-js';
 
 // This would be set as an environment variable in a real application
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || ""
@@ -30,12 +29,11 @@ export async function POST(request: Request) {
         : ""
 
     // Prepare the issue body
-    const osmHash = `HBTC=${CryptoJS.SHA256(osmData.split("\nHBTC")[0]).toString()}`
     const issueBody = `## OSM Location Data
+
 ${osmLink}${description ? `${description}\n\n` : ""}
 \`\`\`
-${osmData.split("\nHBTC")[0]}
-${osmHash}
+${osmData}
 \`\`\`
 
 ${submitter?.name ? `Submitted by: ${submitter.name}` : ""}
